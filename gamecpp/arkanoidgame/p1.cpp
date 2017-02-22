@@ -10,7 +10,7 @@ constexpr int windowWidth{800}, windowHeight{600};
 int main() {
 
 	// Creation of the game window
-	RenderWindow window{{windowHeight, windowWidth}, "Arkanoid - 1"};
+	RenderWindow window{{windowWidth, windowHeight}, "Arkanoid - 1"};
 	window.setFramerateLimit(60);
 
 	// Game loop
