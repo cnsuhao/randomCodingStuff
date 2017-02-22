@@ -6,12 +6,10 @@ using namespace sf;
 
 // 'constexpr' defines an immutable compile-time value
 constexpr int windowWidth{800}, windowHeight{600};
-
-// constants for ball class
 constexpr float ballRadius{10.f}, ballVelocity{8.f};
-
-// paddle for player
 constexpr float paddleWidth{60.f}, paddleHeight{20.f}, paddleVelocity{6.f};
+constexpr float blockWidth{60.f}, blockHeight{20.f};
+constexpr int countBlocksX{11}, countBlocksY{4};
 
 // class for our ball
 // struct == class in c++
@@ -57,8 +55,7 @@ struct Ball {
 };
 
 // paddle class
-struct Paddle
-{
+struct Paddle{
 	// rectangleshape is SMFL class
 	RectangleShape shape;
 	Vector2f velocity;
@@ -95,6 +92,27 @@ struct Paddle
 	float bottom() 	{ return y() + shape.getSize().y / 2.f; }
 };
 
+struct Brick {
+  RectangleShape shape;
+  // boolean to keep track if brick is destroyed or not.
+  bool destroyed{false};
+
+  Brick(float mX, float mY) {
+    shape.setPosition(mX, mY);
+    shape.setSize({blockWidth, blockHeight});
+    shape.setFillColor(Color::Yellow);
+    shape.setOrigin(blockWidth / 2.f, blockHeight / 2.f);
+  }
+
+  float x() 		{ return shape.getPosition().x; }
+  float y() 		{ return shape.getPosition().y; }
+  float left() 	{ return x() - shape.getSize().x / 2.f; }
+  float right() 	{ return x() + shape.getSize().x / 2.f; }
+  float top() 	{ return y() - shape.getSize().y / 2.f; }
+  float bottom() 	{ return y() + shape.getSize().y / 2.f; }
+
+};
+
 // Dealing with collisions: generic function
 // to check if two hsapes are intersecting (colliding)
 template<class T1, class T2> bool isIntersecting(T1& mA, T2 mB) {
@@ -102,7 +120,7 @@ template<class T1, class T2> bool isIntersecting(T1& mA, T2 mB) {
 		   && mA.bottom() >= mB.top() && mA.top() <= mB.bottom();
 }
 
-// function that deals with collision
+// function that deals with collision with ball and paddle
 void testCollision(Paddle& mPaddle, Ball& mBall) {
 
 	//if no intersection, get out
@@ -117,14 +135,56 @@ void testCollision(Paddle& mPaddle, Ball& mBall) {
 
 }
 
+// function to deal with collision with ball and brick
+void testCollision(Brick& mBrick, Ball& mBall) {
+  if(!isIntersecting(mBrick, mBall)) return;
+
+  mBrick.destroyed = true;
+
+  // directional calculations of hit
+  float overlapLeft{mBall.right() - mBrick.left()};
+  float overlapRight{mBrick.right() - mBall.left()};
+  float overlapTop{mBall.bottom() - mBrick.top()};
+  float overlapBottom{mBrick.bottom() - mBall.top()};
+
+  // check if it was hit more towards left or right
+  bool ballFromLeft(abs(overlapLeft) < abs(overlapRight));
+
+  // check same for top than bottom
+  bool ballFromTop(abs(overlapTop) < abs(overlapBottom));
+
+  // store minimum overlaps for the x, and y.
+  float minOverlapX{ballFromLeft ? overlapLeft : overlapRight};
+  float minOverlapY{ballFromTop ? overlapTop : overlapBottom};
+
+  // if overlap in X is bigger than in Y we can safely say
+  // it was horizontal hit, otherwise vertical hit.
+  if (abs(minOverlapX) < abs(minOverlapY)) {
+    mBall.velocity.x = ballFromLeft ? -ballVelocity : ballVelocity;
+  } else {
+    mBall.velocity.y = ballFromTop ? -ballVelocity : ballVelocity;
+  }
+
+
+}
 
 int main() {
 
 	// create instance of ball
 	// positioned at the center of the window
 	Ball ball{windowWidth / 2, windowHeight / 2};
-
 	Paddle paddle{windowWidth / 2, windowHeight -50};
+
+  // create bunch of bricks
+  vector<Brick> bricks;
+
+  // 2D gridloop to fill wall of bricks
+  for(int iX{0}; iX < countBlocksX; ++iX) {
+    for(int iY{0}; iY < countBlocksY; ++iY) {
+      bricks.emplace_back((iX + 1) * (blockWidth + 3) + 22,
+                          (iY + 2) * (blockHeight + 3));
+    }
+  }
 
 	// Creation of the game window
 	RenderWindow window{{windowWidth, windowHeight}, "Arkanoid - 1"};
@@ -143,6 +203,14 @@ int main() {
 		ball.update();
 		paddle.update();
 		testCollision(paddle, ball);
+    for(auto& brick : bricks) testCollision(brick, ball);
+
+    // remove destroyed bricks
+    // bricks.erase(start_iterator, end_iterator) // removes all in between iterators
+    // remove_if(start_of_vector, end_of_vector, function/lambda) // removes items that doesn't pass function/ return true?
+    bricks.erase(remove_if(begin(bricks), end(bricks),
+                 [](const Brick& mBrick){return mBrick.destroyed;}),
+                 end(bricks));
 
 		// If "escape" is pressed, break loop
 		if(Keyboard::isKeyPressed(Keyboard::Key::Escape)) break;
@@ -150,6 +218,10 @@ int main() {
 		// show the window contents
 		window.draw(ball.shape);
 		window.draw(paddle.shape);
+
+    //draws every brick in window
+    //for(Brick& brick : bricks) window.draw(brick.shape);
+    for(auto& brick : bricks) window.draw(brick.shape);
 
 		window.display();
 	}
